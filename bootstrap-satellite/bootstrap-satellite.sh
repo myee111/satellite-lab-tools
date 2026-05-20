@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-TOTAL_STEPS=6
+TOTAL_STEPS=7
 CONFIG_FILE="/etc/sysconfig/bootstrap-satellite"
 NO_REBOOT=false
 
@@ -65,12 +65,16 @@ log 5 "Updating and upgrading system packages"
 dnf update -y
 dnf upgrade -y
 
-# Step 6: Reboot
+# Step 6: Install rhel-system-roles
+log 6 "Installing rhel-system-roles"
+dnf install -y rhel-system-roles
+
+# Step 7: Reboot
 if [ "$NO_REBOOT" = true ]; then
-    log 6 "Skipping reboot (--no-reboot flag set)"
+    log 7 "Skipping reboot (--no-reboot flag set)"
     echo "Bootstrap complete. Reboot the system manually when ready."
 else
-    log 6 "Rebooting in 5 seconds (Ctrl+C to cancel)"
+    log 7 "Rebooting in 5 seconds (Ctrl+C to cancel)"
     sleep 5
     reboot
 fi
