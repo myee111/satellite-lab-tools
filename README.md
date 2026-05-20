@@ -2,16 +2,52 @@
 
 Automation tools for Red Hat Satellite lab environments. Each tool lives in its own directory with a script, config file, and RPM spec.
 
-## set-hostname
+## Prerequisites
 
-A systemd service that sets the system hostname and updates `/etc/hosts` on every boot.
+- RHEL 9 (or compatible) VM
+- System registered with `subscription-manager`
+- `firewalld` installed and running
 
-### Quick Install
+## Quick Start
+
+Download both RPMs and copy them to the VM:
 
 ```bash
 curl -LO https://github.com/myee111/satellite-lab-tools/releases/download/v1.0/set-hostname-1.0-1.el9.noarch.rpm
-sudo dnf install -y ./set-hostname-1.0-1.el9.noarch.rpm
+curl -LO https://github.com/myee111/satellite-lab-tools/releases/download/v1.1/bootstrap-satellite-1.0-1.el9.noarch.rpm
+
+gcloud compute scp set-hostname-1.0-1.el9.noarch.rpm bootstrap-satellite-1.0-1.el9.noarch.rpm \
+  sat-6-19-ga:~/ \
+  --zone us-central1-a --project tmm-instruqt-11-26-2021
 ```
+
+Install both RPMs (`bootstrap-satellite` depends on `set-hostname`):
+
+```bash
+gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
+  --project "tmm-instruqt-11-26-2021" \
+  -- sudo dnf install -y ~/set-hostname-1.0-1.el9.noarch.rpm ~/bootstrap-satellite-1.0-1.el9.noarch.rpm
+```
+
+Configure the hostname, then run the bootstrap:
+
+```bash
+gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
+  --project "tmm-instruqt-11-26-2021" \
+  -- "sudo sed -i 's/^HOSTNAME=.*/HOSTNAME=satellite.lab/' /etc/sysconfig/set-hostname && sudo systemctl enable --now set-hostname.service"
+
+gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
+  --project "tmm-instruqt-11-26-2021" \
+  -- sudo /opt/satellite-lab-tools/bin/bootstrap-satellite.sh
+```
+
+The VM will configure repos, open firewall ports, update packages, and reboot. After reboot it is ready for Satellite installation.
+
+---
+
+## set-hostname
+
+A systemd service that sets the system hostname and updates `/etc/hosts` on every boot.
 
 ### Configuration
 
@@ -54,61 +90,17 @@ sudo dnf remove set-hostname
 
 This disables the service and removes all installed files. The hostname configuration at `/etc/sysconfig/set-hostname` is preserved if it was modified.
 
-### Building the RPM
-
-Requires `rpm-build`:
-
-```bash
-sudo dnf install -y rpm-build
-mkdir -p ~/rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
-
-# Create source tarball
-mkdir set-hostname-1.0
-cp set-hostname/set-hostname.sh set-hostname/set-hostname.conf set-hostname/set-hostname.service set-hostname-1.0/
-tar czf ~/rpmbuild/SOURCES/set-hostname-1.0.tar.gz set-hostname-1.0
-rm -rf set-hostname-1.0
-
-# Build
-cp set-hostname/set-hostname.spec ~/rpmbuild/SPECS/
-rpmbuild -bb ~/rpmbuild/SPECS/set-hostname.spec
-```
-
-The RPM will be at `~/rpmbuild/RPMS/noarch/set-hostname-1.0-1.el9.noarch.rpm`.
-
-### Requirements
-
-- RHEL 9 (or compatible)
-- systemd
-- bash
-
 ---
 
 ## bootstrap-satellite
 
-A one-shot script that prepares a freshly installed RHEL 9 VM for Red Hat Satellite installation.
-
-### Quick Install
-
-Download the RPM, copy it to the VM, and install:
-
-```bash
-curl -LO https://github.com/myee111/satellite-lab-tools/releases/download/v1.1/bootstrap-satellite-1.0-1.el9.noarch.rpm
-
-gcloud compute scp bootstrap-satellite-1.0-1.el9.noarch.rpm \
-  sat-6-19-ga:~/ \
-  --zone us-central1-a --project tmm-instruqt-11-26-2021
-
-gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
-  --project "tmm-instruqt-11-26-2021" \
-  -- sudo dnf install -y ~/bootstrap-satellite-1.0-1.el9.noarch.rpm
-```
+A one-shot script that prepares a freshly installed RHEL 9 VM for Red Hat Satellite installation. It depends on the `set-hostname` RPM, which is installed automatically as a dependency.
 
 ### Configuration
 
-Edit `/etc/sysconfig/bootstrap-satellite` to adjust the Satellite version, repositories, firewall rules, or set-hostname RPM path:
+Edit `/etc/sysconfig/bootstrap-satellite` to adjust the Satellite version, repositories, or firewall rules:
 
 ```bash
-SET_HOSTNAME_RPM="/root/set-hostname-1.0-1.el9.noarch.rpm"
 SATELLITE_VERSION="6.19"
 
 SATELLITE_REPOS=(
@@ -157,14 +149,13 @@ gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
 
 ### What It Does
 
-1. Installs the `set-hostname` RPM
-2. Disables all subscription-manager repositories
-3. Enables the required RHEL 9 and Satellite repositories
-4. Opens firewall ports (8000/tcp, 9090/tcp)
-5. Opens firewall services (dns, dhcp, tftp, http, https, puppetmaster)
-6. Persists firewall rules
-7. Runs `dnf update` and `dnf upgrade`
-8. Reboots the system (unless `--no-reboot` is passed)
+1. Disables all subscription-manager repositories
+2. Enables the required RHEL 9 and Satellite repositories
+3. Opens firewall ports (8000/tcp, 9090/tcp)
+4. Opens firewall services (dns, dhcp, tftp, http, https, puppetmaster)
+5. Persists firewall rules
+6. Runs `dnf update` and `dnf upgrade`
+7. Reboots the system (unless `--no-reboot` is passed)
 
 ### Installed Files
 
@@ -179,30 +170,41 @@ gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
 sudo dnf remove bootstrap-satellite
 ```
 
-### Building the RPM
+---
+
+## Building the RPMs
 
 Requires `rpm-build`:
 
 ```bash
 sudo dnf install -y rpm-build
 mkdir -p ~/rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
+```
 
-# Create source tarball
+### set-hostname
+
+```bash
+mkdir set-hostname-1.0
+cp set-hostname/set-hostname.sh set-hostname/set-hostname.conf set-hostname/set-hostname.service set-hostname-1.0/
+tar czf ~/rpmbuild/SOURCES/set-hostname-1.0.tar.gz set-hostname-1.0
+rm -rf set-hostname-1.0
+
+cp set-hostname/set-hostname.spec ~/rpmbuild/SPECS/
+rpmbuild -bb ~/rpmbuild/SPECS/set-hostname.spec
+```
+
+Output: `~/rpmbuild/RPMS/noarch/set-hostname-1.0-1.el9.noarch.rpm`
+
+### bootstrap-satellite
+
+```bash
 mkdir bootstrap-satellite-1.0
 cp bootstrap-satellite/bootstrap-satellite.sh bootstrap-satellite/bootstrap-satellite.conf bootstrap-satellite-1.0/
 tar czf ~/rpmbuild/SOURCES/bootstrap-satellite-1.0.tar.gz bootstrap-satellite-1.0
 rm -rf bootstrap-satellite-1.0
 
-# Build
 cp bootstrap-satellite/bootstrap-satellite.spec ~/rpmbuild/SPECS/
 rpmbuild -bb ~/rpmbuild/SPECS/bootstrap-satellite.spec
 ```
 
-The RPM will be at `~/rpmbuild/RPMS/noarch/bootstrap-satellite-1.0-1.el9.noarch.rpm`.
-
-### Prerequisites
-
-- RHEL 9 (or compatible)
-- System registered with subscription-manager
-- `firewalld` installed and running
-- `set-hostname` RPM available at the configured path
+Output: `~/rpmbuild/RPMS/noarch/bootstrap-satellite-1.0-1.el9.noarch.rpm`

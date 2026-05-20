@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-TOTAL_STEPS=7
+TOTAL_STEPS=6
 CONFIG_FILE="/etc/sysconfig/bootstrap-satellite"
 NO_REBOOT=false
 
@@ -12,7 +12,9 @@ for arg in "$@"; do
 done
 
 log() {
-    echo "[bootstrap-satellite] [step $1/$TOTAL_STEPS] $2"
+    local msg="[step $1/$TOTAL_STEPS] $2"
+    echo "[bootstrap-satellite] $msg"
+    logger -t bootstrap-satellite "$msg"
 }
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -27,17 +29,8 @@ fi
 
 . "$CONFIG_FILE"
 
-# Step 1: Install set-hostname RPM
-log 1 "Installing set-hostname RPM"
-if [ ! -f "$SET_HOSTNAME_RPM" ]; then
-    echo "Error: set-hostname RPM not found at $SET_HOSTNAME_RPM"
-    echo "Download it or update SET_HOSTNAME_RPM in $CONFIG_FILE"
-    exit 1
-fi
-dnf install -y "$SET_HOSTNAME_RPM"
-
-# Step 2: Disable all repos and enable required ones
-log 2 "Configuring subscription-manager repositories"
+# Step 1: Disable all repos and enable required ones
+log 1 "Configuring subscription-manager repositories"
 if ! command -v subscription-manager &>/dev/null; then
     echo "Error: subscription-manager is not installed"
     exit 1
@@ -47,8 +40,8 @@ for repo in "${SATELLITE_REPOS[@]}"; do
     subscription-manager repos --enable="$repo"
 done
 
-# Step 3: Open firewall ports
-log 3 "Opening firewall ports"
+# Step 2: Open firewall ports
+log 2 "Opening firewall ports"
 if ! command -v firewall-cmd &>/dev/null; then
     echo "Error: firewall-cmd is not installed"
     exit 1
@@ -57,27 +50,27 @@ for port in "${FIREWALL_PORTS[@]}"; do
     firewall-cmd --add-port="$port"
 done
 
-# Step 4: Open firewall services
-log 4 "Opening firewall services"
+# Step 3: Open firewall services
+log 3 "Opening firewall services"
 for service in "${FIREWALL_SERVICES[@]}"; do
     firewall-cmd --add-service="$service"
 done
 
-# Step 5: Persist firewall rules
-log 5 "Persisting firewall rules"
+# Step 4: Persist firewall rules
+log 4 "Persisting firewall rules"
 firewall-cmd --runtime-to-permanent
 
-# Step 6: Update and upgrade system
-log 6 "Updating and upgrading system packages"
+# Step 5: Update and upgrade system
+log 5 "Updating and upgrading system packages"
 dnf update -y
 dnf upgrade -y
 
-# Step 7: Reboot
+# Step 6: Reboot
 if [ "$NO_REBOOT" = true ]; then
-    log 7 "Skipping reboot (--no-reboot flag set)"
+    log 6 "Skipping reboot (--no-reboot flag set)"
     echo "Bootstrap complete. Reboot the system manually when ready."
 else
-    log 7 "Rebooting in 5 seconds (Ctrl+C to cancel)"
+    log 6 "Rebooting in 5 seconds (Ctrl+C to cancel)"
     sleep 5
     reboot
 fi

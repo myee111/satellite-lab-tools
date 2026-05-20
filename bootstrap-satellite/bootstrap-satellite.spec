@@ -1,11 +1,12 @@
 Name:           bootstrap-satellite
-Version:        1.0
+Version:        1.1
 Release:        1%{?dist}
 Summary:        Prepare RHEL 9 for Red Hat Satellite installation
 License:        MIT
 BuildArch:      noarch
 Source0:        %{name}-%{version}.tar.gz
 Requires:       bash
+Requires:       set-hostname
 Requires:       subscription-manager
 Requires:       firewalld
 
