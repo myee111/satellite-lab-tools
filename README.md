@@ -36,7 +36,7 @@ On each boot, the service:
 3. If they differ, runs `hostnamectl set-hostname` and updates `/etc/hosts`
 4. If they match, exits without changes
 
-The `/etc/hosts` file is updated to map both `127.0.0.1` and the machine's primary IP to the configured hostname.
+The `/etc/hosts` update removes any GCP-added hostname entry and maps the machine's primary IP to the configured hostname. Existing entries (localhost, metadata, etc.) are preserved.
 
 ### Installed Files
 
