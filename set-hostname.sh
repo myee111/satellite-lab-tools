@@ -29,15 +29,14 @@ hostnamectl set-hostname "$HOSTNAME"
 
 cp /etc/hosts /etc/hosts.bak
 
-if grep -q "^127\.0\.0\.1" /etc/hosts; then
-    sed -i "s/^127\.0\.0\.1.*/127.0.0.1   localhost localhost.localdomain $HOSTNAME $SHORT_NAME/" /etc/hosts
-else
-    echo "127.0.0.1   localhost localhost.localdomain $HOSTNAME $SHORT_NAME" >> /etc/hosts
-fi
-
 if [ -n "$MACHINE_IP" ]; then
-    sed -i "/^${MACHINE_IP}[[:space:]]/d" /etc/hosts
-    echo "$MACHINE_IP $HOSTNAME $SHORT_NAME" >> /etc/hosts
+    sed -i "/${MACHINE_IP}.*# Added by Google$/d" /etc/hosts
+    if ! grep -q "^${MACHINE_IP}.*${HOSTNAME}" /etc/hosts; then
+        sed -i "s/^${MACHINE_IP}.*/${MACHINE_IP} ${HOSTNAME} ${SHORT_NAME}/" /etc/hosts
+        if ! grep -q "^${MACHINE_IP}" /etc/hosts; then
+            echo "${MACHINE_IP} ${HOSTNAME} ${SHORT_NAME}" >> /etc/hosts
+        fi
+    fi
 fi
 
 echo "Hostname set to $HOSTNAME, /etc/hosts updated"
