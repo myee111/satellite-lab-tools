@@ -19,9 +19,9 @@ ports, and updates the system.
 %setup -q
 
 %install
-install -D -m 0755 bootstrap-satellite.sh %{buildroot}/usr/local/bin/bootstrap-satellite.sh
+install -D -m 0755 bootstrap-satellite.sh %{buildroot}/opt/satellite-lab-tools/bin/bootstrap-satellite.sh
 install -D -m 0644 bootstrap-satellite.conf %{buildroot}/etc/sysconfig/bootstrap-satellite
 
 %files
-/usr/local/bin/bootstrap-satellite.sh
+/opt/satellite-lab-tools/bin/bootstrap-satellite.sh
 %config(noreplace) /etc/sysconfig/bootstrap-satellite

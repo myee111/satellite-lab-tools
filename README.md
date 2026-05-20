@@ -89,16 +89,18 @@ A one-shot script that prepares a freshly installed RHEL 9 VM for Red Hat Satell
 
 ### Quick Install
 
-Copy the RPM to the VM and install it:
+Download the RPM, copy it to the VM, and install:
 
 ```bash
+curl -LO https://github.com/myee111/satellite-lab-tools/releases/download/v1.1/bootstrap-satellite-1.0-1.el9.noarch.rpm
+
 gcloud compute scp bootstrap-satellite-1.0-1.el9.noarch.rpm \
-  sat-6-19-ga:/root/ \
+  sat-6-19-ga:~/ \
   --zone us-central1-a --project tmm-instruqt-11-26-2021
 
 gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
   --project "tmm-instruqt-11-26-2021" \
-  -- sudo dnf install -y /root/bootstrap-satellite-1.0-1.el9.noarch.rpm
+  -- sudo dnf install -y ~/bootstrap-satellite-1.0-1.el9.noarch.rpm
 ```
 
 ### Configuration
@@ -136,13 +138,13 @@ FIREWALL_SERVICES=(
 Run directly on the VM:
 
 ```bash
-sudo bootstrap-satellite.sh
+sudo /opt/satellite-lab-tools/bin/bootstrap-satellite.sh
 ```
 
 Run without the final reboot:
 
 ```bash
-sudo bootstrap-satellite.sh --no-reboot
+sudo /opt/satellite-lab-tools/bin/bootstrap-satellite.sh --no-reboot
 ```
 
 Run remotely via gcloud SSH:
@@ -150,7 +152,7 @@ Run remotely via gcloud SSH:
 ```bash
 gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
   --project "tmm-instruqt-11-26-2021" \
-  -- sudo bootstrap-satellite.sh
+  -- sudo /opt/satellite-lab-tools/bin/bootstrap-satellite.sh
 ```
 
 ### What It Does
@@ -168,7 +170,7 @@ gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
 
 | File | Purpose |
 |------|---------|
-| `/usr/local/bin/bootstrap-satellite.sh` | Main script |
+| `/opt/satellite-lab-tools/bin/bootstrap-satellite.sh` | Main script |
 | `/etc/sysconfig/bootstrap-satellite` | Configuration (preserved on upgrade) |
 
 ### Uninstall
