@@ -1,6 +1,6 @@
 # satellite-lab-tools
 
-Automation tools for Red Hat Satellite lab environments.
+Automation tools for Red Hat Satellite lab environments. Each tool lives in its own directory with a script, config file, and RPM spec.
 
 ## set-hostname
 
@@ -64,12 +64,12 @@ mkdir -p ~/rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
 
 # Create source tarball
 mkdir set-hostname-1.0
-cp set-hostname.sh set-hostname.conf set-hostname.service set-hostname-1.0/
+cp set-hostname/set-hostname.sh set-hostname/set-hostname.conf set-hostname/set-hostname.service set-hostname-1.0/
 tar czf ~/rpmbuild/SOURCES/set-hostname-1.0.tar.gz set-hostname-1.0
 rm -rf set-hostname-1.0
 
 # Build
-cp set-hostname.spec ~/rpmbuild/SPECS/
+cp set-hostname/set-hostname.spec ~/rpmbuild/SPECS/
 rpmbuild -bb ~/rpmbuild/SPECS/set-hostname.spec
 ```
 
@@ -80,3 +80,127 @@ The RPM will be at `~/rpmbuild/RPMS/noarch/set-hostname-1.0-1.el9.noarch.rpm`.
 - RHEL 9 (or compatible)
 - systemd
 - bash
+
+---
+
+## bootstrap-satellite
+
+A one-shot script that prepares a freshly installed RHEL 9 VM for Red Hat Satellite installation.
+
+### Quick Install
+
+Copy the RPM to the VM and install it:
+
+```bash
+gcloud compute scp bootstrap-satellite-1.0-1.el9.noarch.rpm \
+  sat-6-19-ga:/root/ \
+  --zone us-central1-a --project tmm-instruqt-11-26-2021
+
+gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
+  --project "tmm-instruqt-11-26-2021" \
+  -- sudo dnf install -y /root/bootstrap-satellite-1.0-1.el9.noarch.rpm
+```
+
+### Configuration
+
+Edit `/etc/sysconfig/bootstrap-satellite` to adjust the Satellite version, repositories, firewall rules, or set-hostname RPM path:
+
+```bash
+SET_HOSTNAME_RPM="/root/set-hostname-1.0-1.el9.noarch.rpm"
+SATELLITE_VERSION="6.19"
+
+SATELLITE_REPOS=(
+    "rhel-9-for-x86_64-baseos-rpms"
+    "rhel-9-for-x86_64-appstream-rpms"
+    "satellite-${SATELLITE_VERSION}-for-rhel-9-x86_64-rpms"
+    "satellite-maintenance-${SATELLITE_VERSION}-for-rhel-9-x86_64-rpms"
+)
+
+FIREWALL_PORTS=(
+    "8000/tcp"
+    "9090/tcp"
+)
+
+FIREWALL_SERVICES=(
+    "dns"
+    "dhcp"
+    "tftp"
+    "http"
+    "https"
+    "puppetmaster"
+)
+```
+
+### Usage
+
+Run directly on the VM:
+
+```bash
+sudo bootstrap-satellite.sh
+```
+
+Run without the final reboot:
+
+```bash
+sudo bootstrap-satellite.sh --no-reboot
+```
+
+Run remotely via gcloud SSH:
+
+```bash
+gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
+  --project "tmm-instruqt-11-26-2021" \
+  -- sudo bootstrap-satellite.sh
+```
+
+### What It Does
+
+1. Installs the `set-hostname` RPM
+2. Disables all subscription-manager repositories
+3. Enables the required RHEL 9 and Satellite repositories
+4. Opens firewall ports (8000/tcp, 9090/tcp)
+5. Opens firewall services (dns, dhcp, tftp, http, https, puppetmaster)
+6. Persists firewall rules
+7. Runs `dnf update` and `dnf upgrade`
+8. Reboots the system (unless `--no-reboot` is passed)
+
+### Installed Files
+
+| File | Purpose |
+|------|---------|
+| `/usr/local/bin/bootstrap-satellite.sh` | Main script |
+| `/etc/sysconfig/bootstrap-satellite` | Configuration (preserved on upgrade) |
+
+### Uninstall
+
+```bash
+sudo dnf remove bootstrap-satellite
+```
+
+### Building the RPM
+
+Requires `rpm-build`:
+
+```bash
+sudo dnf install -y rpm-build
+mkdir -p ~/rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
+
+# Create source tarball
+mkdir bootstrap-satellite-1.0
+cp bootstrap-satellite/bootstrap-satellite.sh bootstrap-satellite/bootstrap-satellite.conf bootstrap-satellite-1.0/
+tar czf ~/rpmbuild/SOURCES/bootstrap-satellite-1.0.tar.gz bootstrap-satellite-1.0
+rm -rf bootstrap-satellite-1.0
+
+# Build
+cp bootstrap-satellite/bootstrap-satellite.spec ~/rpmbuild/SPECS/
+rpmbuild -bb ~/rpmbuild/SPECS/bootstrap-satellite.spec
+```
+
+The RPM will be at `~/rpmbuild/RPMS/noarch/bootstrap-satellite-1.0-1.el9.noarch.rpm`.
+
+### Prerequisites
+
+- RHEL 9 (or compatible)
+- System registered with subscription-manager
+- `firewalld` installed and running
+- `set-hostname` RPM available at the configured path
