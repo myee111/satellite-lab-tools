@@ -15,9 +15,15 @@ if [ -z "$HOSTNAME" ]; then
     exit 1
 fi
 
-CURRENT_HOSTNAME=$(hostname)
 MACHINE_IP=$(hostname -I | awk '{print $1}')
 SHORT_NAME="${HOSTNAME%%.*}"
+
+cp /etc/hosts /etc/hosts.bak
+if [ -n "$MACHINE_IP" ]; then
+    sed -i "/${MACHINE_IP}.*# Added by Google$/d" /etc/hosts
+fi
+
+CURRENT_HOSTNAME=$(hostname -f 2>/dev/null || hostname)
 
 if [ "$CURRENT_HOSTNAME" = "$HOSTNAME" ] && grep -q "$HOSTNAME" /etc/hosts; then
     echo "Hostname is already set to $HOSTNAME"
@@ -27,10 +33,7 @@ fi
 echo "Setting hostname to $HOSTNAME (was $CURRENT_HOSTNAME)"
 hostnamectl set-hostname "$HOSTNAME"
 
-cp /etc/hosts /etc/hosts.bak
-
 if [ -n "$MACHINE_IP" ]; then
-    sed -i "/${MACHINE_IP}.*# Added by Google$/d" /etc/hosts
     if ! grep -q "^${MACHINE_IP}.*${HOSTNAME}" /etc/hosts; then
         sed -i "s/^${MACHINE_IP}.*/${MACHINE_IP} ${HOSTNAME} ${SHORT_NAME}/" /etc/hosts
         if ! grep -q "^${MACHINE_IP}" /etc/hosts; then

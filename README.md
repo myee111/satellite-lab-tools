@@ -1,6 +1,6 @@
 # satellite-lab-tools
 
-Automation tools for Red Hat Satellite lab environments. Each tool lives in its own directory with a script, config file, and RPM spec.
+Automation tools for Red Hat Satellite lab environments. Includes a persistent hostname service and a one-shot bootstrap script, packaged as a single RPM.
 
 ## Prerequisites
 
@@ -10,23 +10,22 @@ Automation tools for Red Hat Satellite lab environments. Each tool lives in its 
 
 ## Quick Start
 
-Download both RPMs and copy them to the VM:
+Download the RPM and copy it to the VM:
 
 ```bash
-curl -LO https://github.com/myee111/satellite-lab-tools/releases/download/v1.0/set-hostname-1.0-1.el9.noarch.rpm
-curl -LO https://github.com/myee111/satellite-lab-tools/releases/download/v1.1/bootstrap-satellite-1.0-1.el9.noarch.rpm
+curl -LO https://github.com/myee111/satellite-lab-tools/releases/download/v2.0/satellite-lab-tools-2.0-1.el9.noarch.rpm
 
-gcloud compute scp set-hostname-1.0-1.el9.noarch.rpm bootstrap-satellite-1.0-1.el9.noarch.rpm \
+gcloud compute scp satellite-lab-tools-2.0-1.el9.noarch.rpm \
   sat-6-19-ga:~/ \
   --zone us-central1-a --project tmm-instruqt-11-26-2021
 ```
 
-Install both RPMs (`bootstrap-satellite` depends on `set-hostname`):
+Install the RPM:
 
 ```bash
 gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
   --project "tmm-instruqt-11-26-2021" \
-  -- sudo dnf install -y ~/set-hostname-1.0-1.el9.noarch.rpm ~/bootstrap-satellite-1.0-1.el9.noarch.rpm
+  -- sudo dnf install -y ~/satellite-lab-tools-2.0-1.el9.noarch.rpm
 ```
 
 Configure the hostname, then run the bootstrap:
@@ -68,33 +67,18 @@ sudo systemctl enable --now set-hostname.service
 On each boot, the service:
 
 1. Reads the desired hostname from `/etc/sysconfig/set-hostname`
-2. Compares it to the current hostname
-3. If they differ, runs `hostnamectl set-hostname` and updates `/etc/hosts`
-4. If they match, exits without changes
+2. Removes any GCP-added `/etc/hosts` entry that interferes with FQDN resolution
+3. Compares `hostname -f` to the configured hostname
+4. If they differ, runs `hostnamectl set-hostname` and updates `/etc/hosts`
+5. If they match, exits without changes
 
-The `/etc/hosts` update removes any GCP-added hostname entry and maps the machine's primary IP to the configured hostname. Existing entries (localhost, metadata, etc.) are preserved.
-
-### Installed Files
-
-| File | Purpose |
-|------|---------|
-| `/usr/local/bin/set-hostname.sh` | Main script |
-| `/etc/sysconfig/set-hostname` | Hostname configuration (preserved on upgrade) |
-| `/etc/systemd/system/set-hostname.service` | Systemd unit |
-
-### Uninstall
-
-```bash
-sudo dnf remove set-hostname
-```
-
-This disables the service and removes all installed files. The hostname configuration at `/etc/sysconfig/set-hostname` is preserved if it was modified.
+The `/etc/hosts` update maps the machine's primary IP to the configured hostname. Existing entries (localhost, metadata, etc.) are preserved.
 
 ---
 
 ## bootstrap-satellite
 
-A one-shot script that prepares a freshly installed RHEL 9 VM for Red Hat Satellite installation. It depends on the `set-hostname` RPM, which is installed automatically as a dependency.
+A one-shot script that prepares a freshly installed RHEL 9 VM for Red Hat Satellite installation.
 
 ### Configuration
 
@@ -157,22 +141,29 @@ gcloud compute ssh --zone "us-central1-a" "sat-6-19-ga" \
 6. Runs `dnf update` and `dnf upgrade`
 7. Reboots the system (unless `--no-reboot` is passed)
 
-### Installed Files
+---
+
+## Installed Files
 
 | File | Purpose |
 |------|---------|
-| `/opt/satellite-lab-tools/bin/bootstrap-satellite.sh` | Main script |
-| `/etc/sysconfig/bootstrap-satellite` | Configuration (preserved on upgrade) |
+| `/opt/satellite-lab-tools/bin/set-hostname.sh` | Hostname script |
+| `/opt/satellite-lab-tools/bin/bootstrap-satellite.sh` | Bootstrap script |
+| `/etc/sysconfig/set-hostname` | Hostname configuration (preserved on upgrade) |
+| `/etc/sysconfig/bootstrap-satellite` | Bootstrap configuration (preserved on upgrade) |
+| `/etc/systemd/system/set-hostname.service` | Systemd unit |
 
-### Uninstall
+## Uninstall
 
 ```bash
-sudo dnf remove bootstrap-satellite
+sudo dnf remove satellite-lab-tools
 ```
+
+This disables the set-hostname service and removes all installed files. Configuration files at `/etc/sysconfig/` are preserved if they were modified.
 
 ---
 
-## Building the RPMs
+## Building the RPM
 
 Requires `rpm-build`:
 
@@ -181,30 +172,17 @@ sudo dnf install -y rpm-build
 mkdir -p ~/rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
 ```
 
-### set-hostname
+Create the source tarball and build:
 
 ```bash
-mkdir set-hostname-1.0
-cp set-hostname/set-hostname.sh set-hostname/set-hostname.conf set-hostname/set-hostname.service set-hostname-1.0/
-tar czf ~/rpmbuild/SOURCES/set-hostname-1.0.tar.gz set-hostname-1.0
-rm -rf set-hostname-1.0
+mkdir satellite-lab-tools-2.0
+cp set-hostname/set-hostname.sh set-hostname/set-hostname.conf set-hostname/set-hostname.service satellite-lab-tools-2.0/
+cp bootstrap-satellite/bootstrap-satellite.sh bootstrap-satellite/bootstrap-satellite.conf satellite-lab-tools-2.0/
+tar czf ~/rpmbuild/SOURCES/satellite-lab-tools-2.0.tar.gz satellite-lab-tools-2.0
+rm -rf satellite-lab-tools-2.0
 
-cp set-hostname/set-hostname.spec ~/rpmbuild/SPECS/
-rpmbuild -bb ~/rpmbuild/SPECS/set-hostname.spec
+cp packaging/satellite-lab-tools.spec ~/rpmbuild/SPECS/
+rpmbuild -bb ~/rpmbuild/SPECS/satellite-lab-tools.spec
 ```
 
-Output: `~/rpmbuild/RPMS/noarch/set-hostname-1.0-1.el9.noarch.rpm`
-
-### bootstrap-satellite
-
-```bash
-mkdir bootstrap-satellite-1.0
-cp bootstrap-satellite/bootstrap-satellite.sh bootstrap-satellite/bootstrap-satellite.conf bootstrap-satellite-1.0/
-tar czf ~/rpmbuild/SOURCES/bootstrap-satellite-1.0.tar.gz bootstrap-satellite-1.0
-rm -rf bootstrap-satellite-1.0
-
-cp bootstrap-satellite/bootstrap-satellite.spec ~/rpmbuild/SPECS/
-rpmbuild -bb ~/rpmbuild/SPECS/bootstrap-satellite.spec
-```
-
-Output: `~/rpmbuild/RPMS/noarch/bootstrap-satellite-1.0-1.el9.noarch.rpm`
+Output: `~/rpmbuild/RPMS/noarch/satellite-lab-tools-2.0-1.el9.noarch.rpm`

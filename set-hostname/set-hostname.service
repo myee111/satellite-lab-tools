@@ -6,7 +6,7 @@ After=network.target
 Type=oneshot
 RemainAfterExit=yes
 EnvironmentFile=/etc/sysconfig/set-hostname
-ExecStart=/usr/local/bin/set-hostname.sh
+ExecStart=/opt/satellite-lab-tools/bin/set-hostname.sh
 
 [Install]
 WantedBy=multi-user.target
